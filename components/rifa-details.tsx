@@ -10,24 +10,23 @@ import { Calendar, DollarSign, Trophy, Users, Clock, Gift, Banknote } from "luci
 import Link from "next/link" 
 import { useState } from "react";
 
-interface Prize {
+interface Premio {
   id: number
-  title: string
-  description: string
-  image: string
+  titulo: string
+  descripcion: string
+  foto_url: string
 }
 
 interface Rifa {
   id: number
-  title: string
-  description: string
-  price: number
-  gameDate: string
-  image: string
-  status: string
-  ticketsSold: number
-  totalTickets: number
-  prizes: Prize[]
+  titulo: string
+  detalles: string
+  precio: number
+  fecha_culminacion: string
+  foto: string
+  estado: string
+  cantidad_boletos: number
+  premios: Premio[]
 }
 
 interface DatosConsultar {
@@ -54,8 +53,10 @@ export function RifaDetails({ rifa }: RifaDetailsProps) {
     errorPrefijoCedula:  null,
   })
 
-  const progressPercentage = Math.round((rifa.ticketsSold / rifa.totalTickets) * 100)
-  const remainingTickets = rifa.totalTickets - rifa.ticketsSold
+  {/*
+  const progressPercentage = Math.round((rifa.ticketsSold / rifa.cantidad_boletos) * 100)
+  const remainingTickets = rifa.cantidad_boletos - rifa.ticketsSold
+  */}
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -63,14 +64,14 @@ export function RifaDetails({ rifa }: RifaDetailsProps) {
       <div className="mb-8">
         <div className="flex items-center space-x-2 mb-4">
           <Badge
-            variant={rifa.status === "Activa" ? "default" : "secondary"}
-            className={rifa.status === "Activa" ? "bg-primary text-primary-foreground" : ""}
+            variant={rifa.estado === "activa" ? "default" : "secondary"}
+            className={rifa.estado === "activa" ? "bg-primary text-primary-foreground" : ""}
           >
-            {rifa.status}
+            {rifa.estado}
           </Badge>
           <span className="text-muted-foreground">Rifa #{rifa.id}</span>
         </div>
-        <h1 className="text-3xl sm:text-4xl font-bold text-foreground mb-4">{rifa.title}</h1>
+        <h1 className="text-3xl sm:text-4xl font-bold text-foreground mb-4">{rifa.titulo}</h1>
       </div>
 
       <div className="grid lg:grid-cols-3 gap-8">
@@ -80,14 +81,14 @@ export function RifaDetails({ rifa }: RifaDetailsProps) {
           <Card className="overflow-hidden">
             <CardContent className="p-0">
               <img
-                src={rifa.image || "/placeholder.svg"}
-                alt={rifa.title}
+                src={rifa.foto || "/placeholder.svg"}
+                alt={rifa.titulo}
                 className="w-full h-64 sm:h-80 lg:h-96 object-cover"
               />
             </CardContent>
           </Card>
 
-          {/* Description */}
+          {/* descripcion */}
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center space-x-2">
@@ -96,11 +97,11 @@ export function RifaDetails({ rifa }: RifaDetailsProps) {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <p className="text-muted-foreground leading-relaxed">{rifa.description}</p>
+              <p className="text-muted-foreground leading-relaxed">{rifa.detalles}</p>
             </CardContent>
           </Card>
 
-          {/* Prizes */}
+          {/* Premios */}
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center space-x-2">
@@ -110,12 +111,12 @@ export function RifaDetails({ rifa }: RifaDetailsProps) {
             </CardHeader>
             <CardContent>
               <div className="grid sm:grid-cols-2 gap-6">
-                {rifa.prizes.map((prize, index) => (
-                  <div key={prize.id} className="border border-border rounded-lg p-4">
+                {rifa.premios.map((premio, index) => (
+                  <div key={premio.id} className="border border-border rounded-lg p-4">
                     <div className="relative h-32 mb-3 rounded-lg overflow-hidden">
                       <img
-                        src={prize.image || "/placeholder.svg"}
-                        alt={prize.title}
+                        src={premio.foto_url || "/placeholder.svg"}
+                        alt={premio.titulo}
                         className="w-full h-full object-cover"
                       />
                       <div className="absolute top-2 left-2">
@@ -124,8 +125,8 @@ export function RifaDetails({ rifa }: RifaDetailsProps) {
                         </Badge>
                       </div>
                     </div>
-                    <h4 className="font-semibold text-card-foreground mb-2">{prize.title}</h4>
-                    <p className="text-sm text-muted-foreground">{prize.description}</p>
+                    <h4 className="font-semibold text-card-foreground mb-2">{premio.titulo}</h4>
+                    <p className="text-sm text-muted-foreground">{premio.descripcion}</p>
                   </div>
                 ))}
               </div>
@@ -141,11 +142,11 @@ export function RifaDetails({ rifa }: RifaDetailsProps) {
               <CardTitle className="text-center">Comprar Boletos</CardTitle>
             </CardHeader>
             <CardContent className="space-y-6">
-              {/* Price */}
+              {/* precio */}
               <div className="text-center">
                 <div className="flex items-center justify-center space-x-2 mb-2">
                   <Banknote className="h-6 w-6 text-primary" />
-                  <span className="text-3xl font-bold text-foreground">{rifa.price}Bs</span>
+                  <span className="text-3xl font-bold text-foreground">{rifa.precio}Bs</span>
                 </div>
                 <p className="text-muted-foreground">por boleto</p>
               </div>
@@ -175,7 +176,13 @@ export function RifaDetails({ rifa }: RifaDetailsProps) {
                     <Calendar className="h-4 w-4 text-primary" />
                     <span className="text-sm text-muted-foreground">Fecha del sorteo</span>
                   </div>
-                  <span className="font-semibold">{rifa.gameDate}</span>
+                  <span>
+                    {new Date(rifa.fecha_culminacion).toLocaleDateString("es-ES", {
+                    day: "2-digit",
+                    month: "long",
+                    year: "numeric"
+                    }).replace(/^(\d{2}) ([a-záéíóúñ]+) (\d{4})$/, "$1 de $2, $3")}
+                  </span>
                 </div>
               </div>
 
@@ -199,13 +206,13 @@ export function RifaDetails({ rifa }: RifaDetailsProps) {
               <Link href={`/comprar/${rifa.id}`}>
                 <Button
                   className="w-full bg-primary hover:bg-primary/70 text-primary-foreground text-lg py-3 min-h-15"
-                  disabled={rifa.status === "Próximamente"}
+                  disabled={rifa.estado === "Próximamente"}
                 >
-                  {rifa.status === "Próximamente" ? "Próximamente" : "Comprar Boletos"}
+                  {rifa.estado === "Próximamente" ? "Próximamente" : "Comprar Boletos"}
                 </Button>
               </Link>
 
-              {rifa.status === "Activa" && (
+              {rifa.estado === "Activa" && (
                 <p className="mt-2 text-xs text-muted-foreground text-center">
                   Los boletos se asignan automáticamente al confirmar la compra
                 </p>
@@ -260,7 +267,7 @@ export function RifaDetails({ rifa }: RifaDetailsProps) {
                 <Button
                 className="w-full bg-primary hover:bg-primary/70 text-primary-foreground text-lg py-3"
                 disabled={
-                  rifa.status === "Próximamente" ||
+                  rifa.estado === "Próximamente" ||
                   datosConsultar.cedula.length < 7 ||
                   datosConsultar.cedula.length > 8
                 }

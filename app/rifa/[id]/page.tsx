@@ -1,96 +1,125 @@
+"use client"
+
+import { useState, useEffect } from "react"
 import { Navbar } from "@/components/navbar"
 import { Footer } from "@/components/footer"
 import { RifaDetails } from "@/components/rifa-details"
+import { supabase } from "@/lib/supabase-client" 
 
-// Mock data - in a real app this would come from a database
-const rifaData = {
-  1: {
-    id: 1, 
-    title: "Ford Ka 2007",
-    description:
-      "Año 2007  con 150 MIL Kilómetros  Recorrido, 3 Dueños, Transmisión Sincronico, Cauchos Nuevos, Todos Sus documentos en Regla",
-    price: 500,
-    gameDate: "30 de Septiembre, 2025",
-    image: "/fordKa.jpg",
-    status: "Activa",
-    ticketsSold: 1250,
-    totalTickets: 2000,
-    prizes: [
-      {
-        id: 1,
-        title: "Primer Premio - Toyota Corolla 2024",
-        description: "Vehículo completamente nuevo con garantía de fábrica por 3 años",
-        image: "/fordKa.jpg",
-      },
-      {
-        id: 2,
-        title: "Segundo Premio - $500 USD",
-        description: "Quinientos dólares americanos en efectivo",
-        image: "/premiodinero.jpg",
-      },
-      {
-        id: 3,
-        title: "Tercer Premio - $200 USD",
-        description: "Docientos dólares americanos en efectivo",
-        image: "/premiodinero.jpg",
-      },
-    ],
-  },
-  2: {
-    id: 2,
-    title: "Elantra 1.6 2011",
-    description: "Año 2011 Con 180 MIl Kilómetros Recorrido, 3 Dueños, Transmisión Automático, Cauchos Nuevos, Todos Sus documentos en Regla.",
-    price: 400,
-    gameDate: "31 de Octubre, 2025",
-    image: "/elantra16.jpg",
-    status: "Activa",
-    ticketsSold: 890,
-    totalTickets: 1500,
-    prizes: [
-      {
-        id: 1,
-        title: "Primer Premio - Honda Civic Sport 2024",
-        description: "Vehículo deportivo con todas las características premium",
-        image: "/elantra16.jpg",
-      },
-      {
-        id: 2,
-        title: "Segundo Premio - $750 USD",
-        description: "Setecientos cincuenta dólares americanos en efectivo",
-        image: "/premiodinero.jpg",
-      },
-    ],
-  },
-  3: {
-    id: 3,
-    title: "Tacoma TRD Sport 2017",
-    description:
-      "Año 2017 Con 131 MIl Kilómetros Recorrido, 5 Dueños, Transmisión Automática 4X4, Cauchos Nuevos, Todos Sus documentos en Regla.",
-    price: 600,
-    gameDate: "31 de Diciembre, 2025",
-    image: "/tacoma.jpg",
-    status: "Próximamente",
-    ticketsSold: 0,
-    totalTickets: 1000,
-    prizes: [
-      {
-        id: 1,
-        title: "Primer Premio - Chevrolet Spark 2024",
-        description: "Vehículo económico perfecto para la ciudad",
-        image: "/tacoma.jpg",
-      },
-      {
-        id: 2,
-        title: "Segundo Premio - $300 USD",
-        description: "Trecientos dólares americanos en efectivo",
-        image: "//premiodinero.jpg",
-      },
-    ],
-  },
+interface Premio {
+  id: number
+  titulo: string
+  descripcion: string
+  foto_url: string
+  id_rifa: number
+}
+
+interface Rifa {
+  id: number
+  titulo: string
+  detalles: string
+  precio: number
+  fecha_culminacion: string
+  foto: string
+  estado: string
+  cantidad_boletos: number
+  premios: Premio[]
 }
 
 export default function RifaPage({ params }: { params: { id: string } }) {
-  const rifa = rifaData[Number(params.id) as keyof typeof rifaData]
+  const [rifa, setRifa] = useState<Rifa | null>(null)
+  const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  const rifaId = Number(params.id)
+
+  useEffect(() => {
+    const fetchRifaData = async () => {
+      setIsLoading(true)
+      setError(null)
+
+      const { data: rifaData, error: rifaError } = await supabase
+        .from("Rifas")
+        .select("*")
+        .eq("id", rifaId)
+        .single() // Espera un único registro
+
+      if (!rifaData) {
+        setIsLoading(false)
+        window.location.href = "/"
+        return
+      }
+
+      if (rifaError) {
+        console.error("Error al obtener la rifa:", rifaError)
+        setError("Error al cargar la información de la rifa.")
+        setIsLoading(false)
+        return
+      }
+
+      if (!rifaData) {
+        setIsLoading(false)
+        return
+      }
+
+      const { data: premiosData, error: premiosError } = await supabase
+        .from("Premios")
+        .select("*")
+        .eq("id_rifa", rifaId)
+        .order("id", { ascending: true })
+
+      if (premiosError) {
+        console.error("Error al obtener los premios:", premiosError)
+      }
+
+      const fullRifaData: Rifa = {
+        ...(rifaData as Rifa),
+        premios: Array.isArray(premiosData) ? premiosData as Premio[] : [],
+      }
+
+      setRifa(fullRifaData)
+      if (rifaData.estado !== "activa") {
+        setIsLoading(false)
+        window.location.href = "/"
+        return
+      }
+      setIsLoading(false)
+    }
+
+    if (!isNaN(rifaId) && rifaId > 0) {
+      fetchRifaData()
+    } else {
+      setIsLoading(false)
+      setError("ID de rifa no válido.")
+    }
+  }, [rifaId])
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen">
+        <Navbar />
+        <main className="pt-16 flex items-center justify-center min-h-screen">
+          <p className="text-xl text-foreground">Cargando detalles de la rifa...</p>
+        </main>
+        <Footer />
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen">
+        <Navbar />
+        <main className="pt-16 flex items-center justify-center min-h-screen">
+          <div className="text-center">
+            <h1 className="text-2xl font-bold text-red-500 mb-4">Error de Carga</h1>
+            <p className="text-muted-foreground">{error}</p>
+          </div>
+        </main>
+        <Footer />
+      </div>
+    )
+  }
 
   if (!rifa) {
     return (
@@ -99,7 +128,9 @@ export default function RifaPage({ params }: { params: { id: string } }) {
         <main className="pt-16 flex items-center justify-center min-h-screen">
           <div className="text-center">
             <h1 className="text-2xl font-bold text-foreground mb-4">Rifa no encontrada</h1>
-            <p className="text-muted-foreground">La rifa que buscas no existe o ha sido removida.</p>
+            <p className="text-muted-foreground">
+              La rifa con el ID {rifaId} no existe o ha sido removida.
+            </p>
           </div>
         </main>
         <Footer />
@@ -111,7 +142,7 @@ export default function RifaPage({ params }: { params: { id: string } }) {
     <div className="min-h-screen">
       <Navbar />
       <main className="pt-16">
-        <RifaDetails rifa={rifa} />
+        <RifaDetails rifa={rifa} /> 
       </main>
       <Footer />
     </div>

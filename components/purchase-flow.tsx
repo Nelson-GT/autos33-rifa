@@ -17,10 +17,10 @@ import Image from "next/image"
 
 interface Rifa {
   id: number
-  title: string
-  price: number
-  image: string
-  fecha: string
+  titulo: string
+  precio: number
+  foto: string
+  fecha_culminacion: string
 }
 
 interface PurchaseFlowProps {
@@ -93,8 +93,8 @@ export function PurchaseFlow({ rifa }: PurchaseFlowProps) {
     const ticketNumbersFormatted = ticketNumbers.map(num => num.toString().padStart(4, "0"));
     // Los datos que le pasarás a tu API para generar el PDF
     const pdfData = {
-      nombreRifa: rifa.title,
-      fechaJuego: rifa.fecha,
+      nombreRifa: rifa.titulo,
+      fechaJuego: rifa.fecha_culminacion,
       cedula: `${buyerData.cedulaPrefijo}${buyerData.cedula}`,
       boletos: ticketNumbersFormatted,
     };
@@ -120,7 +120,7 @@ export function PurchaseFlow({ rifa }: PurchaseFlowProps) {
       // Crea un enlace temporal para descargar el archivo
       const link = document.createElement('a');
       link.href = url;
-      link.download = `boletos_${buyerData.cedulaPrefijo}${buyerData.cedula}_${rifa.title}.pdf`;
+      link.download = `boletos_${buyerData.cedulaPrefijo}${buyerData.cedula}_${rifa.titulo}.pdf`;
       document.body.appendChild(link);
       link.click();
       
@@ -158,7 +158,7 @@ export function PurchaseFlow({ rifa }: PurchaseFlowProps) {
   const [ticketNumbers, setTicketNumbers] = useState<number[]>([])
   const [errors, setErrors] = useState<Record<string, string>>({})
 
-  const totalAmount = buyerData.ticketQuantity * rifa.price
+  const totalAmount = buyerData.ticketQuantity * rifa.precio
 
   const cambiarValorCantidadBoletos = (valor:string) => {
     const value = valor;
@@ -422,7 +422,7 @@ export function PurchaseFlow({ rifa }: PurchaseFlowProps) {
               <span className="text-2xl font-bold text-primary">{totalAmount}Bs</span>
             </div>
             <p className="text-sm text-muted-foreground mt-1">
-              {buyerData.ticketQuantity} boleto{buyerData.ticketQuantity > 1 ? "s" : ""} × {rifa.price}Bs c/u
+              {buyerData.ticketQuantity} boleto{buyerData.ticketQuantity > 1 ? "s" : ""} × {rifa.precio}Bs c/u
             </p>
           </div>
 
@@ -465,7 +465,7 @@ export function PurchaseFlow({ rifa }: PurchaseFlowProps) {
         <div className="bg-muted p-4 rounded-lg mb-6">
           <h3 className="font-semibold mb-2">Resumen de la compra:</h3>
           <p className="text-sm text-muted-foreground">
-            {buyerData.ticketQuantity} boleto{buyerData.ticketQuantity > 1 ? "s" : ""} para {rifa.title}
+            {buyerData.ticketQuantity} boleto{buyerData.ticketQuantity > 1 ? "s" : ""} para {rifa.titulo}
           </p>
           <p className="text-xl font-bold text-primary">{totalAmount}Bs</p>
         </div>
@@ -675,12 +675,12 @@ export function PurchaseFlow({ rifa }: PurchaseFlowProps) {
       {/* Header */}
       <div className="text-center mb-8">
         <h1 className="text-3xl font-bold text-foreground mb-2">Compar Boletos</h1>
-        <p className="text-muted-foreground">{rifa.title}</p>
+        <p className="text-muted-foreground">{rifa.titulo}</p>
       </div>
 
       {renderStepIndicator()}
 
-      <div className="grid lg:grid-cols-3 gap-8"> {/* adslkaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa */}
+      <div className="grid lg:grid-cols-3 gap-8"> 
         {/* Main Content */}
         <div className="lg:col-span-2">
           {currentStep === 1 && renderStep1()}
@@ -694,12 +694,12 @@ export function PurchaseFlow({ rifa }: PurchaseFlowProps) {
             <CardContent className="p-6">
               <div className="text-center mb-4">
                 <img
-                  src={rifa.image || "/placeholder.svg"}
-                  alt={rifa.title}
+                  src={rifa.foto || "/placeholder.svg"}
+                  alt={rifa.titulo}
                   className="w-full h-32 object-cover rounded-lg mb-3"
                 />
-                <h3 className="font-semibold">{rifa.title}</h3>
-                <p className="text-sm text-muted-foreground">{rifa.price}Bs por boleto</p>
+                <h3 className="font-semibold">{rifa.titulo}</h3>
+                <p className="text-sm text-muted-foreground">{rifa.precio}Bs por boleto</p>
               </div>
 
               {currentStep < 3 && (
@@ -712,7 +712,7 @@ export function PurchaseFlow({ rifa }: PurchaseFlowProps) {
                   </div>
                   <div className="flex justify-between">
                     <span>Precio unitario:</span>
-                    <span>{rifa.price}Bs</span>
+                    <span>{rifa.precio}Bs</span>
                   </div>
                   <hr />
                   <div className="flex justify-between font-semibold text-lg">
