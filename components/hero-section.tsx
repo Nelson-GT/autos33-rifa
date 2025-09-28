@@ -25,7 +25,7 @@
         <div
           className="absolute inset-0 parallax-bg"
           style={{
-            backgroundImage: "url('/vistaAutos331.webp')",
+            backgroundImage: "url('/FondoConcencionario.jpg')",
           }}
         >
           {/* Dark overlay for better text readability */}

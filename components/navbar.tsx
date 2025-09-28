@@ -30,13 +30,13 @@ export function Navbar() {
             <Link href="/" className="text-foreground hover:text-primary transition-colors">
               Inicio
             </Link>
-            <Link href="#rifas" className="text-foreground hover:text-primary transition-colors">
+            <Link href="/#rifas" className="text-foreground hover:text-primary transition-colors">
               Rifas
             </Link>
-            <Link href="#ganadores" className="text-foreground hover:text-primary transition-colors">
+            <Link href="/#ganadores" className="text-foreground hover:text-primary transition-colors">
               Ganadores
             </Link>
-            <Link href="#servicios" className="text-foreground hover:text-primary transition-colors">
+            <Link href="/#servicios" className="text-foreground hover:text-primary transition-colors">
               Servicios
             </Link>
             <div className="bg-primary hover:bg-primary/90 p-2 rounded-md font-medium text-base">
@@ -66,21 +66,21 @@ export function Navbar() {
                 Inicio
               </Link>
               <Link
-                href="#rifas"
+                href="/#rifas"
                 className="block px-3 py-2 text-foreground hover:text-primary transition-colors"
                 onClick={() => setIsOpen(false)}
               >
                 Rifas
               </Link>
               <Link
-                href="#ganadores"
+                href="/#ganadores"
                 className="block px-3 py-2 text-foreground hover:text-primary transition-colors"
                 onClick={() => setIsOpen(false)}
               >
                 Ganadores
               </Link>
               <Link
-                href="#servicios"
+                href="/#servicios"
                 className="block px-3 py-2 text-foreground hover:text-primary transition-colors"
                 onClick={() => setIsOpen(false)}
               >

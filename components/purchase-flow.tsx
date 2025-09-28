@@ -14,6 +14,8 @@ import ShareButton from "@/components/share-button"
 import GenerarPDF from "@/components/generarPdf"
 import Link from "next/link"
 import Image from "next/image"
+import { supabase } from "@/lib/supabase-client" 
+import SHA256 from "crypto-js/sha256"
 
 interface Rifa {
   id: number
@@ -86,6 +88,9 @@ const banks = [
 export function PurchaseFlow({ rifa }: PurchaseFlowProps) {
   const [urlTickets, setUrlTickets] = useState("https://yagxdejizsbugjdfqgva.supabase.co/storage/v1/object/sign/archivos/boletos_rifa_prueba.pdf?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV8wZjNkNzEyMC0wYzExLTQ2M2YtYTdhNi03MzUxMjkwZWEwMmMiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJhcmNoaXZvcy9ib2xldG9zX3JpZmFfcHJ1ZWJhLnBkZiIsImlhdCI6MTc1ODA2Mzc0OCwiZXhwIjo0OTExNjYzNzQ4fQ.bouSoA_AVqUZgbN84vKnCrPhnrJJ25gY-O0ajh0pru4")
   const [loadingDescargaTickets, setloadingDescargaTickets] = useState(false);
+  const [Feedback, setFeedback] = useState("");
+  const [idReserva, setIdReserva] = useState("");
+  const [BoletosReservadosLista, setBoletosReservadosLista] = useState<any[]>([]);
 
   const handleGenerarPDF = async () => {
     setloadingDescargaTickets(true);
@@ -128,7 +133,6 @@ export function PurchaseFlow({ rifa }: PurchaseFlowProps) {
       window.URL.revokeObjectURL(url);
 
     } catch (error) {
-      console.error('Hubo un problema con la operación de fetch:', error);
       alert('Error al generar el PDF. Por favor, inténtalo de nuevo.');
     } finally {
       setloadingDescargaTickets(false);
@@ -176,8 +180,32 @@ export function PurchaseFlow({ rifa }: PurchaseFlowProps) {
       setBuyerData({...buyerData, ticketQuantity: newQuantity,});
     }
   }
+  
+  async function reservarBoletos(cantidad:number, id_rifa:number) {
+    const { data: boletos, error: errorBoletos } = await 
+    supabase.rpc("boletos_aleatorios", {limite : cantidad, p_id_rifa : id_rifa});
+    if (errorBoletos || !boletos || boletos.length < cantidad) {
+      setFeedback("No hay suficientes boletos disponibles en este momento, por favor, Intentelo denuevo más tarde");
+      return false;
+    }
+    const ids = boletos.map((b: { id: number }) => b.id);
+    const id_aux = SHA256(ids.join(",")).toString();
+    setIdReserva(id_aux);
 
-  const validateBuyerData = () => {
+    const { data, error } = await supabase.rpc('reservar_boletos', {
+      p_ids: ids,
+      p_id_reserva: id_aux,
+    });
+    if (error) {
+      setFeedback("Error al reservar los boletos, por favor, Intentelo denuevo más tarde");
+      return false;
+    } else {
+      setFeedback("");
+      return true;
+    }
+  }
+
+  const validateBuyerData = async () => {
     const newErrors: Record<string, string> = {}
 
     if (!buyerData.name.trim()) newErrors.name = "El nombre es requerido"
@@ -204,7 +232,8 @@ export function PurchaseFlow({ rifa }: PurchaseFlowProps) {
     }
 
     setErrors(newErrors)
-    return Object.keys(newErrors).length === 0
+    const respuestaBoletos = await reservarBoletos(buyerData.ticketQuantity, rifa.id);
+    return (Object.keys(newErrors).length === 0 && respuestaBoletos);
   }
 
   const validatePaymentData = () => {
@@ -224,22 +253,76 @@ export function PurchaseFlow({ rifa }: PurchaseFlowProps) {
     return Object.keys(newErrors).length === 0
   }
 
-  const handleBuyerDataSubmit = (e: React.FormEvent) => {
+  const handleBuyerDataSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (validateBuyerData()) {
+    const isValid = await validateBuyerData();
+    if (isValid) {
       setCurrentStep(2)
     }
   }
 
-  const handlePaymentSubmit = (e: React.FormEvent) => {
-    e.preventDefault()
-    if (validatePaymentData()) {
-      // Generate random ticket numbers for demo
-      setmodalConfirmacionCompra(true);
-      const numbers = Array.from({ length: buyerData.ticketQuantity }, () => Math.floor(Math.random() * 9999))
-      setTicketNumbers(numbers)
-      setCurrentStep(3)
+  async function fetchBoletos() {
+    if (idReserva) {
+      const { data, error } = await supabase
+        .from('Boletos')
+        .select('id, id_rifa, numero_boleto')
+        .eq('id_reserva', idReserva);
+
+      if (error) {
+        setFeedback("No se pudieron cargar los boletos de la reserva.");
+        return null; // Retorna null en caso de error
+      }
+
+      if (data && data.length > 0) {
+        return data;
+      }
     }
+    return null;
+  }
+
+  async function finalizarCompraBoleto(ids_numbers:number[]) {
+    const { error } = await supabase
+      .from("Boletos")
+      .update({
+        estado: "ocupado",
+        fecha_compra: new Date().toISOString(),
+        nombre_comprador: buyerData.name,
+        cedula_comprador: `${buyerData.cedulaPrefijo}${buyerData.cedula}`,
+        telefono_comprador: `${buyerData.phonePrefix}${buyerData.phoneNumber}`,
+        correo_comprador: buyerData.email,
+        id_reserva : null,
+      })
+      .in("id", ids_numbers)
+      .eq("estado", "reservado");
+
+      if (error) {
+        setFeedback("Error al confirmar el pago. Por favor, intenta de nuevo.")
+        return false;
+      } else {
+        setFeedback("");
+        return true;
+      }
+    }
+
+  const handlePaymentSubmit: (e: React.FormEvent) => Promise<void> = async (e) => {
+      e.preventDefault();
+      if (validatePaymentData()) {
+          
+          const boletosData = await fetchBoletos(); 
+
+          if (!boletosData || boletosData.length === 0) {
+              setFeedback("Error: No se obtuvieron los boletos reservados.");
+              return;
+          }
+          setBoletosReservadosLista(boletosData);
+          const numbers = boletosData.map(boleto => boleto.numero_boleto);
+          const ids_numbers = boletosData.map(boleto => boleto.id);
+          
+          const respuestaCompra = await finalizarCompraBoleto(ids_numbers);
+          setTicketNumbers(numbers);
+          setmodalConfirmacionCompra(true);
+          setCurrentStep(3);
+      }
   }
 
   const copyTicketNumbers = () => {
@@ -425,6 +508,9 @@ export function PurchaseFlow({ rifa }: PurchaseFlowProps) {
               {buyerData.ticketQuantity} boleto{buyerData.ticketQuantity > 1 ? "s" : ""} × {rifa.precio}Bs c/u
             </p>
           </div>
+          <div className="flex flex-row text-md text-red-500 font-medium justify-center items-center">
+            <span>{Feedback}</span>
+          </div>
 
           <Button type="submit" className="w-full bg-primary hover:bg-primary/90 text-primary-foreground">
             Continuar al Pago
@@ -450,11 +536,11 @@ export function PurchaseFlow({ rifa }: PurchaseFlowProps) {
             <div>
               <h3 className="font-semibold text-blue-800 mb-1">Datos para el pago:</h3>
               <p className="text-sm text-blue-700 mb-2">
-                <strong>Banco:</strong> Banesco
+                <strong>Banco:</strong> R4 BANCO MICROFINANCIERO
                 <br />
                 <strong>Teléfono:</strong> 0424-1234567
                 <br />
-                <strong>Cédula:</strong> V-12345678
+                <strong>Cédula:</strong> {buyerData.cedulaPrefijo}{buyerData.cedula}
                 <br />
                 <strong>Monto:</strong> {totalAmount}Bs
               </p>
@@ -577,7 +663,9 @@ export function PurchaseFlow({ rifa }: PurchaseFlowProps) {
               </div>
             {errors.senderPhone && <p className="text-red-500 text-sm mt-1">{errors.senderPhone}</p>}
           </div>
-
+          <div className="flex flex-row text-md text-red-500 font-medium justify-center items-center">
+            <span>{Feedback}</span>
+          </div>
           <div className="flex space-x-4">
             <Button type="button" variant="outline" onClick={() => setCurrentStep(1)} className="flex-1">
               <ArrowLeft className="mr-2 h-4 w-4" />
