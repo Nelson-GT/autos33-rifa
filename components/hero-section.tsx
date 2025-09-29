@@ -38,7 +38,7 @@
           {/*imagen, probar desde aqui*/}
           <div className="flex-1 flex items-center justify-center md:mt-0 mt-20">
             <Image
-              src="/logoganaconautos33alternativo.png"
+              src="https://jasljnkyrqwbhjerqrus.supabase.co/storage/v1/object/public/imagenes_variadas/LogoganaConAutos33alternativo.png"
               width={400}
               height={150}
               alt="Gana con Autos 33"
