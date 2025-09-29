@@ -10,12 +10,13 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Badge } from "@/components/ui/badge"
 import { ArrowLeft, ArrowRight, User, CreditCard, CheckCircle, AlertCircle, Copy, Check, Download, Share} from "lucide-react"
-import ShareButton from "@/components/share-button"
+import ShareTicketButton from "@/components/ShareTicketButton"
 import GenerarPDF from "@/components/generarPdf"
 import Link from "next/link"
 import Image from "next/image"
 import { supabase } from "@/lib/supabase-client" 
 import SHA256 from "crypto-js/sha256"
+import { useToast } from "@/hooks/use-toast";
 
 interface Rifa {
   id: number
@@ -321,7 +322,11 @@ export function PurchaseFlow({ rifa }: PurchaseFlowProps) {
           const respuestaCompra = await finalizarCompraBoleto(ids_numbers);
           setTicketNumbers(numbers);
           setmodalConfirmacionCompra(true);
+          {/* 
+          paso 3 en cuarentena 
+
           setCurrentStep(3);
+          */}
       }
   }
 
@@ -700,7 +705,7 @@ export function PurchaseFlow({ rifa }: PurchaseFlowProps) {
             <h3 className="font-semibold">Tus Números de Boletos:</h3>
             <div className="flex flex-col mt-2 gap-2">
               <div className="flex flex-col md:flex-row gap-2">
-              <ShareButton url={urlTickets} />
+              
               <Button
                 variant="outline"
                 size="sm"
@@ -854,7 +859,10 @@ export function PurchaseFlow({ rifa }: PurchaseFlowProps) {
                 ¡ Mucha suerte en la Rifa !
               </p>
               <button
-                onClick={() => setmodalConfirmacionCompra(false)}
+                onClick={() => {
+                  setmodalConfirmacionCompra(false);
+                  window.location.href = `/boletos/${rifa.id}/${buyerData.cedulaPrefijo}${buyerData.cedula}`;
+                }}
                 className="px-6 py-2 font-bold text-white bg-green-500 rounded-full hover:bg-green-600 transition-colors duration-200 shadow-md"
               >
                 Cerrar

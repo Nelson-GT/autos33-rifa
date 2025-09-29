@@ -36,9 +36,6 @@ export function Navbar() {
             <Link href="/#ganadores" className="text-foreground hover:text-primary transition-colors">
               Ganadores
             </Link>
-            <Link href="/#servicios" className="text-foreground hover:text-primary transition-colors">
-              Servicios
-            </Link>
             <div className="bg-primary hover:bg-primary/90 p-2 rounded-md font-medium text-base">
               <Link href="https://api.whatsapp.com/send?phone=584143497259" className="text-white transition-colors">
                 Contáctanos
@@ -78,13 +75,6 @@ export function Navbar() {
                 onClick={() => setIsOpen(false)}
               >
                 Ganadores
-              </Link>
-              <Link
-                href="/#servicios"
-                className="block px-3 py-2 text-foreground hover:text-primary transition-colors"
-                onClick={() => setIsOpen(false)}
-              >
-                Servicios
               </Link>
               <div className="px-3 py-2">
                 <Button

@@ -282,7 +282,7 @@ export function RifaDetails({ rifa }: RifaDetailsProps) {
                     ...prev,
                     errorCedula: null,
                   }))
-                  window.location.href = `/boletos/${rifa.id}`
+                  window.location.href = `/boletos/${rifa.id}/${datosConsultar.cedulaPrefijo}${datosConsultar.cedula}`
                   }
                 }}
                 >

@@ -94,6 +94,18 @@ export default function RifaPage({ params }: { params: { id: string } }) {
     }
   }, [rifaId])
 
+  useEffect(() => {
+    async function liberarBoletos() {
+      const { data: data, error: error } = await supabase.rpc('liberar_boletos_reservados');
+      if (error) {
+        console.error('Error al liberar boletos:', error);
+      } else {
+        console.log('Boletos expirados liberados con éxito.');
+      }
+    }
+    liberarBoletos();
+  }, []);
+
   if (isLoading) {
     return (
       <div className="min-h-screen">
