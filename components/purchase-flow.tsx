@@ -59,32 +59,32 @@ const phonePrefixes = [
 ]
 
 const banks = [
-  { value: "0102", label: "BANCO DE VENEZUELA" },
-  { value: "0134", label: "BANESCO" },
-  { value: "0172", label: "BANCAMIGA BANCO UNIVERSAL, C.A." },
-  { value: "0163", label: "BANCO DEL TESORO" },
-  { value: "0105", label: "BANCO MERCANTIL" },
-  { value: "0108", label: "BBVA PROVINCIAL" },
-  { value: "0191", label: "BANCO NACIONAL DE CREDITO" },
   { value: "0156", label: "100% BANCO" },
-  { value: "0114", label: "BANCARIBE" },
+  { value: "0172", label: "BANCAMIGA BANCO UNIVERSAL, C.A." },
   { value: "0171", label: "BANCO ACTIVO" },
+  { value: "0114", label: "BANCARIBE" },
   { value: "0128", label: "BANCO CARONÍ" },
   { value: "0175", label: "BANCO DIGITAL DE LOS TRABAJADORES, BANCO UNIVERSAL" },
   { value: "0115", label: "BANCO EXTERIOR" },
   { value: "0151", label: "BANCO FONDO COMÚN" },
+  { value: "0105", label: "BANCO MERCANTIL" },
+  { value: "0191", label: "BANCO NACIONAL DE CREDITO" },
   { value: "0138", label: "BANCO PLAZA" },
   { value: "0137", label: "BANCO SOFITASA" },
+  { value: "0163", label: "BANCO DEL TESORO" },
+  { value: "0102", label: "BANCO DE VENEZUELA" },
   { value: "0104", label: "BANCO VENEZOLANO DE CREDITO" },
   { value: "0168", label: "BANCRECER" },
   { value: "0177", label: "BANFANB" },
+  { value: "0134", label: "BANESCO" },
   { value: "0146", label: "BANGENTE" },
   { value: "0174", label: "BANPLUS" },
+  { value: "0108", label: "BBVA PROVINCIAL" },
   { value: "0157", label: "DELSUR BANCO UNIVERSAL" },
   { value: "0601", label: "INSTITUTO MUNICIPAL DE CREDITO POPULAR" },
   { value: "0178", label: "N58 BANCO DIGITAL BANCO MICROFINANCIERO S A" },
   { value: "0169", label: "R4 BANCO MICROFINANCIERO C.A." },
-]
+];
 
 export function PurchaseFlow({ rifa }: PurchaseFlowProps) {
   const [urlTickets, setUrlTickets] = useState("https://yagxdejizsbugjdfqgva.supabase.co/storage/v1/object/sign/archivos/boletos_rifa_prueba.pdf?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV8wZjNkNzEyMC0wYzExLTQ2M2YtYTdhNi03MzUxMjkwZWEwMmMiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJhcmNoaXZvcy9ib2xldG9zX3JpZmFfcHJ1ZWJhLnBkZiIsImlhdCI6MTc1ODA2Mzc0OCwiZXhwIjo0OTExNjYzNzQ4fQ.bouSoA_AVqUZgbN84vKnCrPhnrJJ25gY-O0ajh0pru4")
