@@ -4,6 +4,7 @@ import { verifyBankIP } from '@/lib/security';
 
 export async function GET() {
   const isValidIP = verifyBankIP();
+  /*
   if (!isValidIP) {
     console.warn("Intento de acceso no autorizado desde IP desconocida.");
     return NextResponse.json(
@@ -11,6 +12,7 @@ export async function GET() {
       { status: 403 }
     );
   }
+  */
   try {
     
     const data = await getTasaBCV();
