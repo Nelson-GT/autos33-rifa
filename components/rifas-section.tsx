@@ -31,9 +31,7 @@ export function RifasSection() {
       setError(null)
       const { data: updateData, error: updateError } = await supabase.rpc('actualizar_rifas');
       if (updateError) {
-        console.error('Error al actualizar las rifas:', updateError);
-      } else {
-        console.log('El estado de las rifas se ha actualizado correctamente.');
+        alert('Error interno en el servidor, por favor intente más tarde.');
       }
       
       // Obtener todas las rifas activas o próximas

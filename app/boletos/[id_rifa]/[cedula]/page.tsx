@@ -64,7 +64,6 @@ export default function ComprarPage({ params }: ComprarPageParams) {
         .single()
 
       if (rifaError || !rifaData) {
-        console.error("Error al obtener la rifa:", rifaError)
         setError("Rifa no encontrada o error de carga.")
         setIsLoading(false)
         return
@@ -115,9 +114,9 @@ export default function ComprarPage({ params }: ComprarPageParams) {
     
     setloadingDescargaTickets(true);
     const ticketNumbersFormatted = boletos.map(boleto => boleto.numero_boleto.toString().padStart(4, "0"));
-    
+    const tituloLimpio = rifa.titulo.replace(/[^a-zA-Z0-9áéíóúÁÉÍÓÚñÑ .,:;-]/g, '').trim();
     const pdfData = {
-      nombreRifa: rifa.titulo,
+      nombreRifa: tituloLimpio,
       fechaJuego: rifa.fecha_culminacion,
       cedula: cedulaComprador,
       boletos: ticketNumbersFormatted,
@@ -136,7 +135,7 @@ export default function ComprarPage({ params }: ComprarPageParams) {
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
-      link.download = `boletos_${cedulaComprador}_${rifa.titulo}.pdf`;
+      link.download = `boletos_${cedulaComprador}_${tituloLimpio}.pdf`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);

@@ -179,7 +179,6 @@ export async function POST(request) {
       },
     });
   } catch (error) {
-    console.error("Error al enviar datos:", error);
     return NextResponse.json(
       { message: "Error interno del servidor" },
       { status: 500 }

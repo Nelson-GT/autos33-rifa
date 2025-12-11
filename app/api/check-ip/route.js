@@ -19,8 +19,6 @@ export async function GET() {
     });
 
   } catch (error) {
-    console.error(error);
-    
     return NextResponse.json(
       { error: 'Hubo un error obteniendo la IP', detalles: error.message }, 
       { status: 500 }

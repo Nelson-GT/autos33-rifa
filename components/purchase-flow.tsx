@@ -1,22 +1,21 @@
 "use client"
 
 import type React from "react"
-
 import { useState } from "react"
+import Loader from "@/components/loader"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Badge } from "@/components/ui/badge"
-import { ArrowLeft, ArrowRight, User, CreditCard, CheckCircle, AlertCircle, Copy, Check, Download, Share} from "lucide-react"
-import ShareTicketButton from "@/components/ShareTicketButton"
-import GenerarPDF from "@/components/generarPdf"
+import { ArrowLeft, ArrowRight, User, CreditCard, ClockArrowUp, AlertCircle, Copy, Check, Download, Share} from "lucide-react"
 import Link from "next/link"
 import Image from "next/image"
 import { supabase } from "@/lib/supabase-client" 
 import SHA256 from "crypto-js/sha256"
 import { useToast } from "@/hooks/use-toast";
+import { set } from "date-fns"
 
 interface Rifa {
   id: number
@@ -41,12 +40,22 @@ interface BuyerData {
 }
 
 interface PaymentData {
-  reference: string
+  nombre: string
   bank: string
   senderPhone: string
   prefijoTelefono: string
   senderCedula: string
   cedulaPrefijo: string
+  otp: string
+}
+
+interface RespuestaPago {
+  success: boolean
+  status: string
+  message: string
+  reference: string
+  id: string
+  originalCode: string
 }
 
 const phonePrefixes = [
@@ -92,6 +101,18 @@ export function PurchaseFlow({ rifa }: PurchaseFlowProps) {
   const [Feedback, setFeedback] = useState("");
   const [idReserva, setIdReserva] = useState("");
   const [BoletosReservadosLista, setBoletosReservadosLista] = useState<any[]>([]);
+  
+  const formatMonto = (amount: number) => {
+    if (isNaN(amount) || amount < 0) {
+      throw new Error("El monto debe ser un número válido y positivo.");
+    }
+    const formatted = amount.toFixed(2);
+    const [integerPart] = formatted.split('.');
+    if (integerPart.length > 8) {
+      throw new Error(`El monto excede el límite permitido (máximo 8 dígitos enteros). Valor recibido: ${amount}`);
+    }
+    return formatted;
+  }
 
   const handleGenerarPDF = async () => {
     setloadingDescargaTickets(true);
@@ -141,6 +162,7 @@ export function PurchaseFlow({ rifa }: PurchaseFlowProps) {
   };
 
   const [modalConfirmacionCompra, setmodalConfirmacionCompra] = useState(false);
+  const [modalConfirmacionOTP, setmodalConfirmacionOTP] = useState(false);
   const [currentStep, setCurrentStep] = useState(1)
   const [copied, setCopied] = useState(false)
   const [buyerData, setBuyerData] = useState<BuyerData>({
@@ -153,12 +175,21 @@ export function PurchaseFlow({ rifa }: PurchaseFlowProps) {
     ticketQuantity: 2,
   })
   const [paymentData, setPaymentData] = useState<PaymentData>({
-    reference: "",
+    nombre: "",
     bank: "",
     senderPhone: "",
     prefijoTelefono: "0412",
     senderCedula: "",
     cedulaPrefijo: "V-",
+    otp: "",
+  })
+  const [respuestaPago, setRespuestaPago] = useState<RespuestaPago>({
+    success: true,
+    status: "",
+    message: "",
+    reference: "",
+    id: "",
+    originalCode: ""
   })
   const [ticketNumbers, setTicketNumbers] = useState<number[]>([])
   const [errors, setErrors] = useState<Record<string, string>>({})
@@ -240,16 +271,28 @@ export function PurchaseFlow({ rifa }: PurchaseFlowProps) {
   const validatePaymentData = () => {
     const newErrors: Record<string, string> = {}
 
-    if (!paymentData.reference.trim()) newErrors.reference = "La referencia es requerida"
+    if (!paymentData.nombre.trim()) newErrors.nombre = "El nombre es requerido"
     if (!paymentData.bank) newErrors.bank = "El banco es requerido"
     if (!paymentData.senderPhone.trim()) newErrors.senderPhone = "El teléfono es requerido"
     if (!paymentData.senderCedula.trim()) newErrors.senderCedula = "La cédula es requerida"
 
     // Reference validation (basic)
-    if (paymentData.reference && paymentData.reference.length < 6) {
-      newErrors.reference = "La referencia debe tener al menos 6 dígitos"
+    if (paymentData.nombre && paymentData.nombre.length < 2) {
+      newErrors.nombre = "El nombre debe tener al menos 2 carácteres"
     }
 
+    setErrors(newErrors)
+    return Object.keys(newErrors).length === 0
+  }
+
+  const validateOTPData = () => {
+    const newErrors: Record<string, string> = {}
+
+    if (!paymentData.otp.trim()) newErrors.otp = "El código OTP es requerido"
+
+    if (paymentData.otp && paymentData.otp.length != 8) {
+      newErrors.otp = "El código OTP debe tener 8 dígitos"
+    }
     setErrors(newErrors)
     return Object.keys(newErrors).length === 0
   }
@@ -308,25 +351,116 @@ export function PurchaseFlow({ rifa }: PurchaseFlowProps) {
   const handlePaymentSubmit: (e: React.FormEvent) => Promise<void> = async (e) => {
       e.preventDefault();
       if (validatePaymentData()) {
-          
-          const boletosData = await fetchBoletos(); 
-
-          if (!boletosData || boletosData.length === 0) {
-              setFeedback("Error: No se obtuvieron los boletos reservados.");
-              return;
+        try {
+          const cleanNumber = paymentData.senderCedula.replace(/\D/g, '');
+          const paddedNumber = cleanNumber.padStart(8, '0');
+          const cedulaEnvio = `${paymentData.cedulaPrefijo}${paddedNumber}`.replaceAll("-","");
+          const telefonoEnvio = `${paymentData.prefijoTelefono}${paymentData.senderPhone}`;
+          const montoEnvio = formatMonto(totalAmount);
+          const resp = await fetch("/api/otp", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(
+              { banco: paymentData.bank,
+                monto: montoEnvio,
+                telefono: telefonoEnvio,
+                cedula: cedulaEnvio
+              }
+            ),
+          });
+          const json = await resp.json();
+          if (json && json.originalCode === "202") {
+            setCurrentStep(3);
+          } else {
+            setFeedback(json?.message || "No se pudo verificar el pago.");
           }
-          setBoletosReservadosLista(boletosData);
-          const numbers = boletosData.map(boleto => boleto.numero_boleto);
-          const ids_numbers = boletosData.map(boleto => boleto.id);
-          
-          const respuestaCompra = await finalizarCompraBoleto(ids_numbers);
-          setTicketNumbers(numbers);
-          setmodalConfirmacionCompra(true);
-          {/* 
-          paso 3 en cuarentena 
+        } catch (error) {
+          setFeedback("Error al comunicarse con el servidor. Intentelo de nuevo más tarde.");
+        }
+      }
+  }
+  const handleOTPSubmit: (e: React.FormEvent) => Promise<void> = async (e) => {
+      e.preventDefault();
+      if (validateOTPData()) {
+          setFeedback("");  
+          setmodalConfirmacionOTP(true);
 
-          setCurrentStep(3);
-          */}
+          try {
+            const cleanNumber = paymentData.senderCedula.replace(/\D/g, '');
+            const paddedNumber = cleanNumber.padStart(8, '0');
+            const cedulaEnvio = `${paymentData.cedulaPrefijo}${paddedNumber}`.replaceAll("-","");
+            const telefonoEnvio = `${paymentData.prefijoTelefono}${paymentData.senderPhone}`;
+            const montoEnvio = formatMonto(totalAmount);
+            const resp = await fetch("/api/debito/proceso", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(
+                { banco: paymentData.bank,
+                  monto: montoEnvio,
+                  telefono: telefonoEnvio,
+                  cedula: cedulaEnvio,
+                  nombre: paymentData.nombre,
+                  otp: paymentData.otp,
+                  concepto: paymentData.nombre,
+                }
+              ),
+            });
+            let json = await resp.json();
+            if (json && json.status === "PENDIENTE") {
+              let intentos = 0;
+              const maxIntentos = 20;
+              while (json.status === "PENDIENTE" && intentos < maxIntentos) {
+                await new Promise(resolve => setTimeout(resolve, 3000)); // 3 segundos antes de continuar
+                const checkResp = await fetch("/api/debito/check-estado", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ id: json.id })
+                });
+                
+                json = await checkResp.json();
+                intentos++;
+              }
+            }
+            if (json && json.status === "APROBADO") {
+              setRespuestaPago({...respuestaPago,
+                success: true,
+                status: json.status,
+                message: json.message,
+                reference: json.reference,
+                id: json.id
+              });
+              const boletosData = await fetchBoletos();
+              if (!boletosData || boletosData.length === 0) {
+                setFeedback("Pago aprobado, pero hubo un error obteniendo los boletos. Por favor contacte soporte.");
+                setmodalConfirmacionOTP(false);
+                return;
+              }
+
+              setBoletosReservadosLista(boletosData);
+              const numbers = boletosData.map(boleto => boleto.numero_boleto);
+              const ids_numbers = boletosData.map(boleto => boleto.id);
+              
+              await finalizarCompraBoleto(ids_numbers);
+              setTicketNumbers(numbers);
+              // setmodalConfirmacionOTP(false); 
+
+            } else {
+              const mensajeError = json.status === "PENDIENTE" 
+                ? "La operación está tardando demasiado. Por favor verifique en su banco si se realizó el débito."
+                : json.message || "La transacción fue rechazada.";
+
+              setRespuestaPago({...respuestaPago,
+                success: false,
+                status: json.status || "ERROR",
+                message: mensajeError,
+                id: json.id,
+                originalCode: json.originalCode,
+              });
+              setFeedback(mensajeError);
+            }
+          } catch (error) {
+            setFeedback("Error al comunicarse con el servidor. Intentelo de nuevo más tarde.");
+          }
       }
   }
 
@@ -349,7 +483,7 @@ export function PurchaseFlow({ rifa }: PurchaseFlowProps) {
             >
               {step === 1 && <User className="h-4 w-4" />}
               {step === 2 && <CreditCard className="h-4 w-4" />}
-              {step === 3 && <CheckCircle className="h-4 w-4" />}
+              {step === 3 && <ClockArrowUp className="h-4 w-4" />}
             </div>
             {step < 3 && <div className={`w-12 h-0.5 mx-2 ${step < currentStep ? "bg-primary" : "bg-muted"}`} />}
           </div>
@@ -361,9 +495,14 @@ export function PurchaseFlow({ rifa }: PurchaseFlowProps) {
   const renderStep1 = () => (
     <Card>
       <CardHeader>
-        <CardTitle className="flex items-center space-x-2">
-          <User className="h-5 w-5 text-primary" />
-          <span>Datos del Comprador</span>
+        <CardTitle className="flex-col items-left space-x-2 space-y-2">
+          <div className="flex gap-3">
+            <User className="h-5 w-5 text-primary" />
+            <span>Datos del Comprador</span>
+          </div>
+          <div className="flex-row pl-1">
+            <p className="text-sm font-medium text-gray-600">Datos que aparecerán en sus boletos.</p>
+          </div>
         </CardTitle>
       </CardHeader>
       <CardContent>
@@ -375,7 +514,9 @@ export function PurchaseFlow({ rifa }: PurchaseFlowProps) {
                 id="name"
                 type="text"
                 value={buyerData.name}
-                onChange={(e) => setBuyerData({ ...buyerData, name: e.target.value })}
+                onChange={(e) => {
+                  setBuyerData({ ...buyerData, name: e.target.value });
+                  setPaymentData({ ...paymentData, nombre: e.target.value })}}
                 required
                 placeholder="Ingresa tu nombre completo"
                 className={errors.name ? "border-red-500 mt-2" : " mt-2"}
@@ -387,7 +528,10 @@ export function PurchaseFlow({ rifa }: PurchaseFlowProps) {
               <div className="flex flex-row gap-1">
                 <Select
                   value={buyerData.cedulaPrefijo}
-                  onValueChange={(value) => setBuyerData({ ...buyerData, cedulaPrefijo: value })}
+                  onValueChange={(value) => {
+                    setBuyerData({ ...buyerData, cedulaPrefijo: value });
+                    setPaymentData({ ...paymentData, cedulaPrefijo: value })
+                  }}
                   required
                 >
                   <SelectTrigger className={errors.phonePrefix ? "border-red-500 mt-2" : " mt-2"}>
@@ -406,7 +550,10 @@ export function PurchaseFlow({ rifa }: PurchaseFlowProps) {
                   id="cedula"
                   type="text"
                   value={buyerData.cedula}
-                  onChange={(e) => setBuyerData({ ...buyerData, cedula: e.target.value })}
+                  onChange={(e) => {
+                    setBuyerData({ ...buyerData, cedula: e.target.value });
+                    setPaymentData({ ...paymentData, senderCedula: e.target.value })
+                  }}
                   required
                   maxLength={8}
                   minLength={7}
@@ -437,7 +584,10 @@ export function PurchaseFlow({ rifa }: PurchaseFlowProps) {
               <Label htmlFor="phonePrefix">Prefijo *</Label>
               <Select
                 value={buyerData.phonePrefix}
-                onValueChange={(value) => setBuyerData({ ...buyerData, phonePrefix: value })}
+                onValueChange={(value) => {
+                  setBuyerData({ ...buyerData, phonePrefix: value });
+                  setPaymentData({ ...paymentData, prefijoTelefono: value })
+              }}
                 required
               >
                 <SelectTrigger className={errors.phonePrefix ? "border-red-500 mt-2" : " mt-2"}>
@@ -459,7 +609,10 @@ export function PurchaseFlow({ rifa }: PurchaseFlowProps) {
                 id="phoneNumber"
                 type="tel"
                 value={buyerData.phoneNumber}
-                onChange={(e) => setBuyerData({ ...buyerData, phoneNumber: e.target.value })}
+                onChange={(e) => {
+                  setBuyerData({ ...buyerData, phoneNumber: e.target.value });
+                  setPaymentData({ ...paymentData, senderPhone: e.target.value })
+              }}
                 required
                 maxLength={7}
                 minLength={7}
@@ -529,12 +682,18 @@ export function PurchaseFlow({ rifa }: PurchaseFlowProps) {
   const renderStep2 = () => (
     <Card>
       <CardHeader>
-        <CardTitle className="flex items-center space-x-2">
-          <CreditCard className="h-5 w-5 text-primary" />
-          <span>Datos del Pago Móvil</span>
+        <CardTitle className="flex-col items-left space-x-2 space-y-2">
+          <div className="flex gap-3">
+            <CreditCard className="h-5 w-5 text-primary" />
+            <span>Datos para el Pago</span>
+          </div>
+          <div className="flex-row pl-1">
+            <p className="text-sm font-medium text-gray-600">Información de Cobro.</p>
+          </div>
         </CardTitle>
       </CardHeader>
       <CardContent>
+        {/* 
         <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
           <div className="flex items-start space-x-2">
             <AlertCircle className="h-5 w-5 text-blue-600 mt-0.5" />
@@ -552,6 +711,7 @@ export function PurchaseFlow({ rifa }: PurchaseFlowProps) {
             </div>
           </div>
         </div>
+        */}
 
         <div className="bg-muted p-4 rounded-lg mb-6">
           <h3 className="font-semibold mb-2">Resumen de la compra:</h3>
@@ -563,17 +723,17 @@ export function PurchaseFlow({ rifa }: PurchaseFlowProps) {
 
         <form onSubmit={handlePaymentSubmit} className="space-y-6">
           <div>
-            <Label htmlFor="reference">Número de Referencia *</Label>
+            <Label htmlFor="nombre">Nombre del Comprador *</Label>
             <Input
-              id="reference"
+              id="nombre"
               type="text"
-              value={paymentData.reference}
-              onChange={(e) => setPaymentData({ ...paymentData, reference: e.target.value })}
+              value={paymentData.nombre}
+              onChange={(e) => setPaymentData({ ...paymentData, nombre: e.target.value })}
               required
-              placeholder="123456789"
-              className={errors.reference ? "border-red-500" : ""}
+              placeholder="Pedro Perez"
+              className={errors.nombre ? "border-red-500" : ""}
             />
-            {errors.reference && <p className="text-red-500 text-sm mt-1">{errors.reference}</p>}
+            {errors.nombre && <p className="text-red-500 text-sm mt-1">{errors.nombre}</p>}
           </div>
 
           <div>
@@ -690,16 +850,45 @@ export function PurchaseFlow({ rifa }: PurchaseFlowProps) {
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center justify-center space-x-2 text-center gap-2">
-          <CheckCircle className="h-5 w-5 text-green-500" />
-          <span>¡Compra Exitosa!</span>
+          <ClockArrowUp className="h-5 w-5 text-red-500" />
+          <span>Confirmando el Pago</span>
         </CardTitle>
       </CardHeader>
-      <CardContent className="text-center space-y-6">
-        <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-          <h3 className="font-semibold text-green-800 mb-2">Pago Verificado</h3>
-          <p className="text-green-700">Tu pago ha sido procesado exitosamente</p>
-        </div>
-
+      <CardContent className="text-left space-y-6">
+        <form onSubmit={handleOTPSubmit} className="space-y-6">
+          <div className="rounded-lg p-4">
+            <h3 className="font-semibold mb-2">Se ha enviado un código a {paymentData.prefijoTelefono}-{paymentData.senderPhone}</h3>
+            <p className="">Por favor, introduzca el código OTP Para finalizar el pago</p>
+            <Input
+              id="senderPhone"
+              type="text"
+              value={paymentData.otp}
+              onChange={(e) => {
+                const val = (e.target as HTMLInputElement).value;
+                if (/^\d*$/.test(val)) {
+                  setPaymentData({ ...paymentData, otp: val });
+              }}}
+              required
+              maxLength={8}
+              minLength={8}
+              placeholder="12345678"
+              className={errors.otp ? "border-red-500 mt-2" : " mt-2"}
+            />
+            {errors.otp && <p className="text-red-500 text-sm mt-1">{errors.otp}</p>}
+          </div>
+          <div className="flex flex-col sm:flex-row gap-4">
+            <Button type="button" variant="outline" onClick={() => setCurrentStep(2)} className="flex-1">
+              <ArrowLeft className="mr-2 h-4 w-4" />
+              Volver
+            </Button>
+            <Button type="submit" className="flex-1 bg-primary hover:bg-primary/90 text-primary-foreground">
+              Confirmar Pago
+              <ArrowRight className="ml-2 h-4 w-4" />
+            </Button>
+          </div>
+        </form>
+        
+        {/*
         <div className="bg-muted p-4 rounded-lg">
           <div className="flex flex-col md:flex-row items-center justify-between mb-4">
             <h3 className="font-semibold">Tus Números de Boletos:</h3>
@@ -748,7 +937,9 @@ export function PurchaseFlow({ rifa }: PurchaseFlowProps) {
           <p>• Los ganadores serán contactados inmediatamente</p>
           <p>• Todos los premios incluyen documentación legal</p>
         </div>
+        */}
 
+        {/* s 
         <div className="flex flex-col sm:flex-row gap-4">
           <Link href={`/rifa/${rifa.id}`} className="flex-1">
             <Button variant="outline" className="w-full bg-transparent">
@@ -759,6 +950,7 @@ export function PurchaseFlow({ rifa }: PurchaseFlowProps) {
             <Button className="w-full bg-primary hover:bg-primary/90 text-primary-foreground">Volver al Inicio</Button>
           </Link>
         </div>
+        */}
       </CardContent>
     </Card>
   )
@@ -872,6 +1064,137 @@ export function PurchaseFlow({ rifa }: PurchaseFlowProps) {
           </div>
         </div>
       )}
+      {modalConfirmacionOTP && (
+        <>
+          {respuestaPago.status === "APROBADO" && respuestaPago.success ? (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+              <div
+                className="absolute inset-x-0 z-0 flex items-center justify-center"
+                style={{
+                  transform:
+                  typeof window !== "undefined" && window.innerWidth < 768
+                    ? "translateY(-10rem)"
+                    : "translateY(-8rem)",
+                }}
+                >
+                <div className="w-80 h-80 sm:w-96 sm:h-96 md:w-[400px] md:h-[400px] relative">
+                  <Image
+                  src="/modelo2.png"
+                  alt="Compra realizada exitosamente"
+                  layout="fill"
+                  objectFit="contain"
+                  />
+                </div>
+              </div>
+              <div className="relative z-10 w-11/12 max-w-md mx-auto text-center rounded-2xl bg-white/95 shadow-2xl overflow-hidden animate-fade-in">
+              {/* caso en que haya sido exitoso ----------------------------------------------------------------- */}
+                <div className="py-6 px-6">
+                  <div className="">
+                    <h2 className="text-4xl font-extrabold mb-2 animate-bounce-in">
+                      Pago Realizado Con exito
+                    </h2>
+                  </div>
+                  <div className="flex flex-col rounded-xl border border-gray-300 px-6 py-4 bg-gray-200 my-6 justify-start items-start text-left">
+                    <p className="text-gray-600 text-md mb-2 font-medium justify-start">
+                      <span className="font-bold text-gray-700">Estatus:</span> {respuestaPago.status}
+                    </p>
+                    <p className="text-gray-600 text-md mb-2 font-medium justify-start">
+                      <span className="font-bold text-gray-700">Mensaje:</span> {respuestaPago.message}
+                    </p>
+                    <div className="flex items-center justify-between w-full">
+                      <p className="text-gray-700 text-md font-medium flex items-center">
+                        <span className="font-bold text-gray-700 mr-2">Referencia:</span> {respuestaPago.reference}
+                      </p>
+                      <button
+                        onClick={() => { navigator.clipboard.writeText(respuestaPago.reference ?? ""); }}
+                        className="inline-flex items-center justify-center h-8 px-2 font-semibold text-white bg-gray-500 rounded-lg hover:bg-gray-600 transition-colors duration-200 shadow-md"
+                      >
+                        <Copy className="h-4 w-4" />
+                      </button>
+                    </div>
+                  </div>
+                  {/* */}
+                  <button
+                    onClick={() => {
+                      setmodalConfirmacionOTP(false);
+                      window.location.href = `/boletos/${rifa.id}/${buyerData.cedulaPrefijo}${buyerData.cedula}`;
+                    }}
+                    className="px-6 py-2 font-semibold text-white bg-green-500 rounded-full hover:bg-green-600 transition-colors duration-200 shadow-md"
+                  >
+                    Finalizar
+                  </button>
+                  {/**/}
+                </div>
+              </div>
+            </div>
+          ) : respuestaPago.success ? (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+              <div className="relative z-10 w-11/12 max-w-md mx-auto text-center rounded-2xl bg-white/95 shadow-2xl overflow-hidden animate-fade-in">
+                {/*caso en retorne pendiente*/}
+                <div className="py-6 px-6">
+                  <div className="">
+                    <h2 className="text-4xl font-extrabold mb-2 animate-bounce-in">
+                      Verificando ...
+                    </h2>
+                    <div className="flex flex-col py-6">
+                    <Loader></Loader>
+                    </div>
+                  </div>
+                  <p className="text-gray-700 text-md mb-2 font-medium">
+                    Esto puede tomar algunos segundos.
+                  </p>
+                  <p className="text-gray-700 text-md mb-2 font-medium">
+                    No cierre esta ventana mientras verificamos su pago.
+                  </p>
+                  {/*
+                  <button
+                    onClick={() => {
+                      setmodalConfirmacionOTP(false);
+                      //* window.location.href = `/boletos/${rifa.id}/${buyerData.cedulaPrefijo}${buyerData.cedula}`;
+                      
+                    }}
+                    className="px-6 py-2 font-bold text-white bg-green-500 rounded-full hover:bg-green-600 transition-colors duration-200 shadow-md"
+                  >
+                    Cerrar
+                  </button>
+                  */}
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+              <div className="relative z-10 w-11/12 max-w-md mx-auto text-center rounded-2xl bg-white/95 shadow-2xl overflow-hidden animate-fade-in">
+              <div className="py-6 px-6">
+                  <div className="">
+                    <h2 className="text-4xl font-extrabold mb-2 animate-bounce-in">
+                      Pago Rechazado
+                    </h2>
+                  </div>
+                    <div className="flex flex-col rounded-xl border border-gray-300 px-6 py-4 bg-gray-200 my-6 justify-start items-start text-left">
+                      <p className="text-gray-600 text-md mb-2 font-medium">
+                        <span className="font-bold text-gray-700">Estatus:</span> {respuestaPago.status}
+                      </p>
+                      <p className="text-gray-600 text-md mb-2 font-medium">
+                        <span className="font-bold text-gray-700">Mensaje:</span> {respuestaPago.message}
+                      </p>
+                    </div>
+                  {/* */}
+                  <button
+                    onClick={() => {
+                      window.location.href = "/";
+                    }}
+                    className="px-6 py-2 font-bold text-white bg-green-500 rounded-full hover:bg-green-600 transition-colors duration-200 shadow-md"
+                  >
+                    Volver al Inicio
+                  </button>
+                  {/**/}
+                </div>
+              </div>
+            </div>
+          )}
+        </>
+      )}
+      
     </div>
   )
 }

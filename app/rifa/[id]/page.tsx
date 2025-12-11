@@ -100,7 +100,6 @@ export default function RifaPage({ params }: { params: { id: string } }) {
       if (error) {
         console.error('Error al liberar boletos:', error);
       } else {
-        console.log('Boletos expirados liberados con éxito.');
       }
     }
     liberarBoletos();
